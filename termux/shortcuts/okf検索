@@ -1,0 +1,29 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 検索語を Gboard で入力し（termux-dialog）、結果の一覧から選んでターミナルで読む。
+# 読み終えて less を q で閉じると一覧に戻る。一覧でキャンセルすると終了。
+. "$HOME/.config/pocket/env" 2>/dev/null
+if [ ! -d "${OKF_BUNDLE:-}" ]; then
+	echo "OKF_BUNDLE が未設定か、見つかりません: ${OKF_BUNDLE:-（空）}"
+	echo "~/.config/pocket/env を編集してください"
+	read -rp "Enterで閉じる"; exit 1
+fi
+
+q=$(termux-dialog text -t "okf 検索" -i "検索語（スペース区切りで AND）" | jq -r 'select(.code == -1) | .text // empty')
+[ -z "$q" ] && exit 0
+
+if ! res=$(okf search "$OKF_BUNDLE" "$q" --limit 50 --json 2>&1); then
+	echo "$res"; read -rp "Enterで閉じる"; exit 1
+fi
+count=$(jq .count <<<"$res")
+if [ "$count" = 0 ]; then
+	termux-toast "「$q」は見つかりませんでした"; exit 0
+fi
+# sheet の選択肢はカンマ区切りなので、タイトル中のカンマは全角にする
+labels=$(jq -r '[.results[] | (.title // .id) | gsub(","; "，")] | join(",")' <<<"$res")
+
+while :; do
+	idx=$(termux-dialog sheet -t "「$q」$count 件" -v "$labels" | jq -r '.index // empty')
+	[ -z "$idx" ] && exit 0
+	id=$(jq -r ".results[$idx].id" <<<"$res")
+	okf show "$OKF_BUNDLE" "$id" --human --no-pager | less -R
+done

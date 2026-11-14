@@ -9,6 +9,13 @@ Termux のホーム画面ショートカットから使う、Go 製の小さな�
 | **クイックメモ** | ダイアログで一行入力 → 日時つきで `pocket-memo.md` に追記 |
 | **メモを見る** | 最近 10 件のメモを表示 |
 | **共有 → Termux** | ブラウザで見ているページを `[タイトル](URL)` にしてコピー |
+| **okf検索** | 検索語を Gboard で入力 → 結果一覧から選んで読む（q で一覧に戻る） |
+| **okf今日に追記** | Gboard で書いた文を、時刻つき箇条書きで今日のデイリーノートに追記（なければ Templates/daily から作成） |
+| **okf新規ノート** | タイトル・本文・タグを Gboard で入力してノートを作成 |
+
+okf 系は Termux のターミナルでは日本語入力がつらい問題への対策で、入力はすべて Android 標準のダイアログ（termux-dialog）で行う。
+okf 本体は [Mokkori-Tom/okf](https://github.com/Mokkori-Tom/okf) の ja-human ブランチを、このリポジトリのリリースで arm64 向けにビルドして配っている。
+バンドルの場所は `~/.config/pocket/env` の `OKF_BUNDLE`（setup.sh が共有ストレージの Obsidian 保管庫を探して書く）。
 
 ## セットアップ（Android）
 

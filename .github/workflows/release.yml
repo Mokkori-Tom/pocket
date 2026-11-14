@@ -11,9 +11,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.27.x"
       - run: go test ./...
       - run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o pocket-linux-arm64 .
-      - run: gh release create "$GITHUB_REF_NAME" pocket-linux-arm64 --generate-notes
+      - uses: actions/checkout@v4
+        with:
+          repository: Mokkori-Tom/okf
+          ref: ja-human
+          path: okf-src
+      - name: okf (ja-human) for arm64
+        working-directory: okf-src
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=ja-human-$(git rev-parse --short HEAD)" -o ../okf-linux-arm64 ./cmd/okf
+      - run: gh release create "$GITHUB_REF_NAME" pocket-linux-arm64 okf-linux-arm64 --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

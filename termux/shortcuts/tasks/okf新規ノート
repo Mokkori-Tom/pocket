@@ -1,0 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# タイトル・本文・タグを Gboard で入力して、新しいノートを作る（ファイル名はタイトル）。
+. "$HOME/.config/pocket/env" 2>/dev/null
+[ -d "${OKF_BUNDLE:-}" ] || { termux-toast "OKF_BUNDLE を ~/.config/pocket/env に設定してください"; exit 1; }
+
+ask() { termux-dialog text "$@" | jq -r 'select(.code == -1) | .text // empty'; }
+
+title=$(ask -t "新規ノート (1/3)" -i "タイトル")
+[ -z "$title" ] && exit 0
+body=$(ask -m -t "新規ノート (2/3)" -i "本文（空でも可）")
+tags=$(ask -t "新規ノート (3/3)" -i "タグ（カンマ区切り、空でも可）")
+
+id=${title//\//-}
+args=(--title "$title")
+[ -n "$tags" ] && args+=(--tag "${tags//，/,}")
+if out=$(okf new "$OKF_BUNDLE" "$id" "${args[@]}" --body - <<<"${body:-# $title}" 2>&1 >/dev/null); then
+	termux-toast "作成しました: $id.md"
+else
+	termux-notification --id pocket-okf -t "ノートを作れませんでした" -c "$out"
+fi
