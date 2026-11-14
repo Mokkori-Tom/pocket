@@ -18,6 +18,7 @@ Termux のホーム画面ショートカットから使う、Go 製の小さな�
    pkg install -y git && git clone https://github.com/Mokkori-Tom/pocket && pocket/setup.sh
    ```
 3. ホーム画面を長押し → ウィジェット → Termux:Widget
+4. Android 10 以降: 設定 → アプリ → Termux → **他のアプリの上に重ねて表示** を許可（ウィジェットからターミナルを開くのに必要）
 
 更新は `cd pocket && git pull && ./setup.sh`。
 リリースが無い場合や `./setup.sh --build` のときは端末上でビルドする（golang パッケージを入れる）。
