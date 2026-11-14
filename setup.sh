@@ -28,9 +28,10 @@ rm -f "$BIN/pocket"  # 旧バージョンの置き場所
 "$DEST" --help >/dev/null
 
 echo "==> ショートカット"
+rm -f "$HOME/.shortcuts/tasks/クリップを解読"  # 旧バージョンの置き場所
 cp -r termux/shortcuts/. "$HOME/.shortcuts/"
 chmod 700 "$HOME/.shortcuts" "$HOME/.shortcuts/tasks"
-chmod +x "$HOME"/.shortcuts/tasks/* "$HOME"/.shortcuts/メモを見る
+chmod +x "$HOME"/.shortcuts/tasks/* "$HOME"/.shortcuts/クリップを解読 "$HOME"/.shortcuts/メモを見る
 
 echo "==> 共有メニュー (termux-url-opener)"
 if [ -e "$BIN/termux-url-opener" ] && ! cmp -s termux/bin/termux-url-opener "$BIN/termux-url-opener"; then

@@ -1,0 +1,17 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# クリップボードの中身を pocket decode で読める形にし、結果をクリップボードに戻す。
+# Android 10 以降はバックグラウンドからクリップボードを読めないので、tasks/ ではなく
+# ターミナルを開く（前面に出る）ショートカットにしている。
+in=$(termux-clipboard-get)
+if [ -z "$in" ]; then
+	echo "クリップボードが空か、読み取れませんでした"
+elif out=$(printf '%s' "$in" | pocket decode 2>&1); then
+	kind=${out%%$'\n'*}
+	body=${out#*$'\n'}
+	printf '%s' "$body" | termux-clipboard-set
+	printf '■ %s（結果をコピーしました）\n\n%s\n' "$kind" "$body"
+else
+	printf '%s\n\n入力: %.200s\n' "$out" "$in"
+fi
+echo
+read -rp "Enterで閉じる"
