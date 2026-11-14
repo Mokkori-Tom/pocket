@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 最近のメモを表示する（ターミナルが開く）
+pocket memo
+echo
+read -rp "Enterで閉じる"

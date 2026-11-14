@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 他のアプリで「共有 → Termux」したURLを Markdown リンクにしてクリップボードへ
+if out=$(pocket link "$1" 2>&1); then
+	printf '%s' "$out" | termux-clipboard-set
+	termux-notification --id pocket-link -t "リンクをコピーしました" -c "$out"
+else
+	termux-notification --id pocket-link -t "リンク作成に失敗" -c "$out"
+fi

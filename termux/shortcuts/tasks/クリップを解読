@@ -1,0 +1,11 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# クリップボードの中身を pocket decode で読める形にし、結果をクリップボードに戻して通知する
+in=$(termux-clipboard-get)
+if out=$(printf '%s' "$in" | pocket decode 2>&1); then
+	kind=${out%%$'\n'*}
+	body=${out#*$'\n'}
+	printf '%s' "$body" | termux-clipboard-set
+	termux-notification --id pocket-decode -t "解読: $kind（コピー済み）" -c "$body"
+else
+	termux-toast "$out"
+fi
