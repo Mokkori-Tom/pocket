@@ -1,77 +1,102 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Termux 上で pocket とショートカット一式をセットアップする。何度実行してもよい（更新にも使える）。
+#
+#   ./setup.sh          基本の道具（クリップを解読・クイックメモ・メモを見る・共有メニュー）
+#   ./setup.sh --okf    okf のショートカットも入れる（一度入れれば、以降の更新では自動で入る）
+#   ./setup.sh --build  ダウンロードせず端末上でビルドする
 set -euo pipefail
 cd "$(dirname "$0")"
 
+WITH_OKF=0 BUILD=0
+for a in "$@"; do
+	case $a in
+	--okf) WITH_OKF=1 ;;
+	--build) BUILD=1 ;;
+	*) echo "不明なオプション: $a"; exit 2 ;;
+	esac
+done
+
+if [[ ${PREFIX:-} != */com.termux/* ]]; then
+	echo "Termux の中で実行してください"; exit 1
+fi
+
 REPO=${POCKET_REPO:-Mokkori-Tom/pocket}
 BIN=$HOME/bin
-# ウィジェットから起動したスクリプトは ~/.bashrc を読まないので、本体は常に PATH にある $PREFIX/bin に置く
-DEST=${PREFIX:-/data/data/com.termux/files/usr}/bin/pocket
-mkdir -p "$BIN" "$HOME/.shortcuts/tasks" "$HOME/.shortcuts/icons"
+# ウィジェットから起動したスクリプトは ~/.bashrc を読まないので、コマンドは常に PATH にある $PREFIX/bin に置く。
+# 逆に ~/.bashrc は（ble.sh などの設定を壊さないよう）一切触らない。
+PBIN=$PREFIX/bin
+CONF=$HOME/.config/pocket/env
+mkdir -p "$BIN" "$HOME/.shortcuts/tasks" "$HOME/.shortcuts/icons" "$(dirname "$CONF")"
+
+# 前回 okf を入れていれば、今回も入れる
+if [ -e "$CONF" ] && grep -q '^OKF_BUNDLE="..*"' "$CONF"; then WITH_OKF=1; fi
+
+# fetch <リリースのファイル名> <置き場所>: リリースから取ってくる。失敗したら 1 を返す
+fetch() {
+	[ $BUILD = 1 ] && return 1
+	curl -fsSL -o "$2.new" "https://github.com/$REPO/releases/latest/download/$1" && mv "$2.new" "$2" && chmod +x "$2"
+}
+need_go() { command -v go >/dev/null || pkg install -y golang >/dev/null; }
+
+echo "==> 内部ストレージへのアクセス"
+if [ ! -d "$HOME/storage/shared" ]; then
+	echo "    許可のダイアログが出たら「許可」を押してください"
+	termux-setup-storage
+	for _ in $(seq 30); do [ -d "$HOME/storage/shared" ] && break; sleep 2; done
+	[ -d "$HOME/storage/shared" ] || echo "    !! 許可されませんでした。メモは Termux の中（~/pocket-memo.md）に保存されます"
+fi
 
 echo "==> パッケージ"
 pkg install -y termux-api jq curl >/dev/null
 
 echo "==> pocket 本体"
-if [ "${1:-}" = "--build" ]; then
-	command -v go >/dev/null || pkg install -y golang >/dev/null
-	go build -o "$DEST" .
-elif ! curl -fsSL -o "$DEST.new" "https://github.com/$REPO/releases/latest/download/pocket-linux-arm64"; then
-	echo "    リリースから取得できませんでした。端末上でビルドします"
-	command -v go >/dev/null || pkg install -y golang >/dev/null
-	go build -o "$DEST" .
-else
-	mv "$DEST.new" "$DEST"
+if ! fetch pocket-linux-arm64 "$PBIN/pocket"; then
+	echo "    端末上でビルドします（少し時間がかかります）"
+	need_go
+	go build -o "$PBIN/pocket" .
 fi
-chmod +x "$DEST"
-rm -f "$BIN/pocket"  # 旧バージョンの置き場所
-"$DEST" --help >/dev/null
+rm -f "$BIN/pocket" # 古い版の置き場所
+pocket --help >/dev/null
 
-echo "==> okf（Mokkori-Tom/okf の ja-human 版）"
-OKF_DEST=${DEST%/pocket}/okf
-if [ "${1:-}" = "--build" ] || ! curl -fsSL -o "$OKF_DEST.new" "https://github.com/$REPO/releases/latest/download/okf-linux-arm64"; then
-	command -v go >/dev/null || pkg install -y golang >/dev/null
-	tmp=$(mktemp -d)
-	git clone -q --depth 1 -b ja-human https://github.com/Mokkori-Tom/okf "$tmp"
-	(cd "$tmp" && go build -trimpath -ldflags "-s -w -X main.version=ja-human-$(git rev-parse --short HEAD)" -o "$OKF_DEST" ./cmd/okf)
-	rm -rf "$tmp"
-else
-	mv "$OKF_DEST.new" "$OKF_DEST"
-fi
-chmod +x "$OKF_DEST"
-"$OKF_DEST" version
+if [ $WITH_OKF = 1 ]; then
+	echo "==> okf（Mokkori-Tom/okf の ja-human 版）"
+	if ! fetch okf-linux-arm64 "$PBIN/okf"; then
+		need_go
+		tmp=$(mktemp -d)
+		git clone -q --depth 1 -b ja-human https://github.com/Mokkori-Tom/okf "$tmp"
+		(cd "$tmp" && go build -trimpath -ldflags "-s -w -X main.version=ja-human-$(git rev-parse --short HEAD)" -o "$PBIN/okf" ./cmd/okf)
+		rm -rf "$tmp"
+	fi
+	okf version
 
-echo "==> 設定 (~/.config/pocket/env)"
-CONF=$HOME/.config/pocket/env
-mkdir -p "$(dirname "$CONF")"
-if [ ! -e "$CONF" ]; then
-	# 共有ストレージにある Obsidian の保管庫（.obsidian を含むフォルダ）を探す
-	mapfile -t vaults < <(find "$HOME/storage/shared/" -maxdepth 4 -type d -name .obsidian 2>/dev/null | sed 's|/\.obsidian$||')
-	{
-		echo "# pocket のショートカットが読む設定"
-		if [ ${#vaults[@]} -eq 1 ]; then
-			echo "OKF_BUNDLE=\"${vaults[0]}\""
-		else
-			echo "OKF_BUNDLE=\"\"  # ← okf のバンドル（Obsidian の保管庫）のパスを書く"
-			for v in "${vaults[@]}"; do echo "#OKF_BUNDLE=\"$v\""; done
-		fi
-		echo "OKF_AUTHOR=human:tua"
-		echo "export OKF_AUTHOR"
-	} >"$CONF"
-fi
-. "$CONF"
-if [ -d "${OKF_BUNDLE:-}" ]; then
-	echo "    OKF_BUNDLE=$OKF_BUNDLE"
-else
-	echo "    !! okf のバンドルが決まっていません。$CONF の OKF_BUNDLE を書いてください"
-	[ -d "$HOME/storage" ] || echo "    （先に termux-setup-storage が必要です）"
+	if [ ! -e "$CONF" ] || ! grep -q '^OKF_BUNDLE=' "$CONF"; then
+		# 共有ストレージにある Obsidian の保管庫（.obsidian を含むフォルダ）を探す
+		mapfile -t vaults < <(find "$HOME/storage/shared/" -maxdepth 4 -type d -name .obsidian 2>/dev/null | sed 's|/\.obsidian$||')
+		{
+			echo "# pocket の okf ショートカットが読む設定"
+			if [ ${#vaults[@]} -eq 1 ]; then
+				echo "OKF_BUNDLE=\"${vaults[0]}\""
+			else
+				echo "OKF_BUNDLE=\"\"  # ← okf のバンドル（Obsidian の保管庫）のパスを書く"
+				for v in "${vaults[@]}"; do echo "#OKF_BUNDLE=\"$v\""; done
+			fi
+			echo "#export OKF_AUTHOR=human:名前  # ノートの作成者として記録される"
+		} >>"$CONF"
+	fi
+	. "$CONF"
+	if [ -d "${OKF_BUNDLE:-}" ]; then
+		echo "    OKF_BUNDLE=$OKF_BUNDLE"
+	else
+		echo "    !! okf のバンドルが決まっていません。$CONF の OKF_BUNDLE を書いてください"
+	fi
 fi
 
 echo "==> ショートカット"
-rm -f "$HOME/.shortcuts/tasks/クリップを解読"  # 旧バージョンの置き場所
+rm -f "$HOME/.shortcuts/tasks/クリップを解読" # 古い版の置き場所（バックグラウンドではクリップボードを読めない）
 cp -r termux/shortcuts/. "$HOME/.shortcuts/"
+if [ $WITH_OKF = 1 ]; then cp -r termux/okf-shortcuts/. "$HOME/.shortcuts/"; fi
 chmod 700 "$HOME/.shortcuts" "$HOME/.shortcuts/tasks"
-chmod +x "$HOME"/.shortcuts/tasks/* "$HOME"/.shortcuts/クリップを解読 "$HOME"/.shortcuts/メモを見る "$HOME"/.shortcuts/okf検索
+find "$HOME/.shortcuts" -type f ! -path '*/icons/*' -exec chmod +x {} +
 
 echo "==> 共有メニュー (termux-url-opener)"
 if [ -e "$BIN/termux-url-opener" ] && ! cmp -s termux/bin/termux-url-opener "$BIN/termux-url-opener"; then
@@ -81,16 +106,29 @@ fi
 cp termux/bin/termux-url-opener "$BIN/"
 chmod +x "$BIN/termux-url-opener"
 
-[ -d "$HOME/storage" ] || echo "ヒント: termux-setup-storage を実行すると、メモが内部ストレージの Documents に保存されます"
+echo "==> Termux:API アプリの確認"
+# アプリが無い（または入手元が違って署名が合わない）と termux-* コマンドは応答しないまま止まる
+if timeout 15 termux-toast "pocket のセットアップが終わりました" 2>/dev/null; then
+	api_ok=1
+else
+	api_ok=0
+fi
 
-cat <<'MSG'
+echo
+if [ $api_ok = 1 ]; then
+	echo "完了！"
+else
+	cat <<'MSG'
+!! Termux:API アプリから応答がありません。
+   F-Droid から Termux:API を入れてください。Termux 本体と入手元（F-Droid / GitHub）が
+   違うと動きません。Google Play 版の Termux が入っている場合は、全部 F-Droid 版に入れ直してください。
+MSG
+fi
+cat <<MSG
 
-完了！ あとはホーム画面を長押し → ウィジェット → Termux:Widget を置いてください。
-  クリップを解読 … コピーした JSON / Base64 / UNIX時刻などを読める形に
-  クイックメモ   … ダイアログで一行メモ
-  メモを見る     … 最近のメモを表示
-  共有 → Termux  … ブラウザのページを Markdown リンクとしてコピー
-  okf検索         … Gboard で検索語を入れ、一覧から選んで読む
-  okf今日に追記   … Gboard で書いた文を今日のデイリーノートに追記
-  okf新規ノート   … タイトル・本文・タグを Gboard で入れてノートを作成
+残りの手順（初回のみ）:
+  1. 設定 → アプリ → Termux → 「他のアプリの上に重ねて表示」を許可
+     （機種によって「フローティング表示」「ポップアップ表示」などの名前です）
+  2. ホーム画面を長押し → ウィジェット → Termux:Widget を置く
+     更新したあとは、ウィジェットの 🔄 を押すか置き直してください
 MSG
