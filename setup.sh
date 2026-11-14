@@ -5,6 +5,8 @@ cd "$(dirname "$0")"
 
 REPO=${POCKET_REPO:-Mokkori-Tom/pocket}
 BIN=$HOME/bin
+# ウィジェットから起動したスクリプトは ~/.bashrc を読まないので、本体は常に PATH にある $PREFIX/bin に置く
+DEST=${PREFIX:-/data/data/com.termux/files/usr}/bin/pocket
 mkdir -p "$BIN" "$HOME/.shortcuts/tasks" "$HOME/.shortcuts/icons"
 
 echo "==> パッケージ"
@@ -13,15 +15,17 @@ pkg install -y termux-api jq curl >/dev/null
 echo "==> pocket 本体"
 if [ "${1:-}" = "--build" ]; then
 	command -v go >/dev/null || pkg install -y golang >/dev/null
-	go build -o "$BIN/pocket" .
-elif ! curl -fsSL -o "$BIN/pocket.new" "https://github.com/$REPO/releases/latest/download/pocket-linux-arm64"; then
+	go build -o "$DEST" .
+elif ! curl -fsSL -o "$DEST.new" "https://github.com/$REPO/releases/latest/download/pocket-linux-arm64"; then
 	echo "    リリースから取得できませんでした。端末上でビルドします"
 	command -v go >/dev/null || pkg install -y golang >/dev/null
-	go build -o "$BIN/pocket" .
+	go build -o "$DEST" .
 else
-	mv "$BIN/pocket.new" "$BIN/pocket"
+	mv "$DEST.new" "$DEST"
 fi
-chmod +x "$BIN/pocket"
+chmod +x "$DEST"
+rm -f "$BIN/pocket"  # 旧バージョンの置き場所
+"$DEST" --help >/dev/null
 
 echo "==> ショートカット"
 cp -r termux/shortcuts/. "$HOME/.shortcuts/"
@@ -35,11 +39,6 @@ if [ -e "$BIN/termux-url-opener" ] && ! cmp -s termux/bin/termux-url-opener "$BI
 fi
 cp termux/bin/termux-url-opener "$BIN/"
 chmod +x "$BIN/termux-url-opener"
-
-case ":$PATH:" in *":$BIN:"*) ;; *)
-	echo 'export PATH="$HOME/bin:$PATH"' >>"$HOME/.bashrc"
-	echo "    ~/.bashrc に PATH を追加しました" ;;
-esac
 
 [ -d "$HOME/storage" ] || echo "ヒント: termux-setup-storage を実行すると、メモが内部ストレージの Documents に保存されます"
 
