@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # 最近のメモを表示する（ターミナルが開く）
+set -a; . "$HOME/.config/pocket/env" 2>/dev/null; set +a  # POCKET_MEMO（メモの保存先）
 pocket memo
 echo
 read -rp "Enterで閉じる"

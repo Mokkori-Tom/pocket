@@ -11,6 +11,7 @@ Termux のホーム画面ショートカットから使う、Go 製の小さな�
 | **メモを見る** | 最近 10 件のメモを表示 |
 | **クリップを解読** | コピー中の JSON / Base64 / URLエンコード / UNIX時刻 / JWT を自動判別して整形し、クリップボードに戻す |
 | **共有 → Termux** | ブラウザで見ているページを `[タイトル](URL)` にしてコピー |
+| **メモの保存先を選ぶ** | メモの保存先フォルダを一覧から選び直す（今までのメモを移すかも聞く） |
 
 `setup.sh --okf` で、okf（ノートの CLI）用のショートカットも入る。
 
@@ -22,7 +23,9 @@ Termux のホーム画面ショートカットから使う、Go 製の小さな�
 | **okf新規ノート** | フォルダを一覧から選び（雑記が先頭）、タイトル・本文・タグを Gboard で入力してノートを作成 |
 
 okf 本体は [Mokkori-Tom/okf](https://github.com/Mokkori-Tom/okf) の ja-human ブランチを、このリポジトリのリリースで arm64 向けにビルドして配っている。
-設定は `~/.config/pocket/env`（`OKF_BUNDLE`、`OKF_DAILY`、`OKF_AUTHOR`）。バンドルは「okfバンドルを選ぶ」で選ぶ（setup.sh も共有ストレージの Obsidian 保管庫を探す）。
+設定は `~/.config/pocket/env`（`POCKET_MEMO`、`OKF_BUNDLE`、`OKF_DAILY`、`OKF_AUTHOR`）。
+メモの保存先と okf のバンドルは、初回の setup.sh がその場で一覧から選ばせる（あとからショートカットで選び直せる）。
+フォルダ選択は `pocket-pick-dir`（内部ストレージを termux-dialog の一覧でたどる）、設定の書き込みは `pocket-setconf KEY VALUE` で、どちらも `$PREFIX/bin` に入る。
 
 ## セットアップ
 
@@ -42,7 +45,7 @@ pocket link https://go.dev/       # → [The Go Programming Language](https://go
 pocket memo 牛乳を買う             # 引数なしで最近のメモを表示
 ```
 
-メモの保存先は `$POCKET_MEMO` → `~/storage/shared/Documents/pocket-memo.md`（`termux-setup-storage` 済みの場合）→ `~/pocket-memo.md` の順。
+メモの保存先は `$POCKET_MEMO` → `~/storage/shared/Documents/pocket-memo.md`（`termux-setup-storage` 済みの場合）→ `~/pocket-memo.md` の順（`pocket memo-path` で確認できる）。
 
 ## Termux 向けに作るときの注意（実機で分かったこと）
 
@@ -53,6 +56,7 @@ pocket memo 牛乳を買う             # 引数なしで最近のメモを表�
 - **ショートカットの場所を変えると、ウィジェットは古いパスを呼び続ける**（`FileUtils Error ... not found`）。ウィジェットの 🔄 か置き直しが必要。
 - **Termux のターミナルでは日本語入力がつらい。** `termux-dialog` は Android 標準の入力欄なので Gboard がそのまま使える。入力はダイアログで受け、パスのような選べるものは `termux-dialog sheet` の一覧で選ばせる。
 - **Termux / Termux:Widget / Termux:API は入手元をそろえる。** 署名が違うと動かない。Termux:API が無いと `termux-*` コマンドは応答せずに止まるので、`timeout` を付けて確かめる。
+- **`$(...)` で結果を受け取るときに `2>&1` を付けない。** 警告などが標準エラーに出ると、受け取ったパスに混ざって設定が壊れる。
 - **前面のショートカットは、終了後も Termux の画面が残ることがある**（別のセッションがあるとそちらに切り替わる）。結果は `Enterで閉じる` で止めて見せる。
 
 ## リリース

@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # 入力ダイアログを出し、日時つきでメモに追記する
+set -a; . "$HOME/.config/pocket/env" 2>/dev/null; set +a  # POCKET_MEMO（メモの保存先）
 text=$(termux-dialog text -t "クイックメモ" -i "思いついたことを一行で" | jq -r '.text // empty')
 [ -z "$text" ] && exit 0
 termux-toast "$(pocket memo "$text" 2>&1)"

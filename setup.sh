@@ -48,6 +48,19 @@ fi
 
 echo "==> パッケージ"
 pkg install -y termux-api jq curl >/dev/null
+cp termux/cmd/* "$PBIN/" # pocket-pick-dir, pocket-setconf
+chmod +x "$PBIN"/pocket-pick-dir "$PBIN"/pocket-setconf
+
+echo "==> Termux:API アプリの確認"
+# アプリが無い（または入手元が違って署名が合わない）と termux-* コマンドは応答しないまま止まる
+if timeout 15 termux-toast "pocket をセットアップしています" 2>/dev/null; then
+	api_ok=1
+else
+	api_ok=0
+	echo "    !! 応答がありません（最後に説明を表示します）"
+fi
+# 画面の一覧から選んでもらえるのは、Termux:API が動いていて内部ストレージを読めるときだけ
+can_pick() { [ $api_ok = 1 ] && [ -d "$HOME/storage/shared" ]; }
 
 echo "==> pocket 本体"
 if ! fetch pocket-linux-arm64 "$PBIN/pocket"; then
@@ -69,27 +82,44 @@ if [ $WITH_OKF = 1 ]; then
 	fi
 	okf version
 
-	if [ ! -e "$CONF" ] || ! grep -q '^OKF_BUNDLE=' "$CONF"; then
-		# 共有ストレージにある Obsidian の保管庫（.obsidian を含むフォルダ）を探す
-		mapfile -t vaults < <(find "$HOME/storage/shared/" -maxdepth 4 -type d -name .obsidian 2>/dev/null | sed 's|/\.obsidian$||')
+	if ! grep -q 'OKF_DAILY' "$CONF" 2>/dev/null; then
 		{
-			echo "# pocket の okf ショートカットが読む設定"
-			if [ ${#vaults[@]} -eq 1 ]; then
-				echo "OKF_BUNDLE=\"${vaults[0]}\""
-			else
-				for v in "${vaults[@]}"; do echo "#OKF_BUNDLE=\"$v\""; done
-			fi
 			echo "#export OKF_AUTHOR=human:名前  # ノートの作成者として記録される"
 			echo "#OKF_DAILY=\"日記/%Y/%m/%F\"     # 日誌の場所（date の書式）。バンドル直下なら \"%F\""
 		} >>"$CONF"
 	fi
+	OKF_BUNDLE=
 	. "$CONF"
+	if [ ! -d "${OKF_BUNDLE:-}" ] && can_pick; then
+		echo "    okf のバンドル（ノートのフォルダ）を、画面に出る一覧から選んでください"
+		if dir=$(pocket-pick-dir "okf のバンドルを選ぶ" "${OKF_BUNDLE:-}"); then
+			pocket-setconf OKF_BUNDLE "$dir"
+			OKF_BUNDLE=$dir
+		fi
+	fi
 	if [ -d "${OKF_BUNDLE:-}" ]; then
 		echo "    OKF_BUNDLE=$OKF_BUNDLE"
 	else
-		echo "    !! okf のバンドルが決まっていません。ウィジェットの「okfバンドルを選ぶ」で選んでください"
+		echo "    !! okf のバンドルが決まっていません。あとでウィジェットの「okfバンドルを選ぶ」で選んでください"
 	fi
 fi
+
+echo "==> メモの保存先"
+POCKET_MEMO=
+. "$CONF" 2>/dev/null || true
+if [ -z "${POCKET_MEMO:-}" ] && can_pick; then
+	docs=$HOME/storage/shared/Documents
+	echo "    画面に出る選択肢から選んでください"
+	idx=$(termux-dialog sheet -t "クイックメモの保存先" -v "Documents フォルダ（おすすめ）,自分で選ぶ（Google ドライブや同期フォルダなど）" | jq -r '.index // empty')
+	if [ "$idx" = 1 ] && dir=$(pocket-pick-dir "メモを保存するフォルダ"); then
+		POCKET_MEMO=$dir/pocket-memo.md
+	else
+		mkdir -p "$docs"
+		POCKET_MEMO=$docs/pocket-memo.md
+	fi
+	pocket-setconf POCKET_MEMO "$POCKET_MEMO"
+fi
+echo "    ${POCKET_MEMO:-$(pocket memo-path)}（ウィジェットの「メモの保存先を選ぶ」で変えられます）"
 
 echo "==> ショートカット"
 rm -f "$HOME/.shortcuts/tasks/クリップを解読" # 古い版の置き場所（バックグラウンドではクリップボードを読めない）
@@ -107,16 +137,9 @@ fi
 cp termux/bin/termux-url-opener "$BIN/"
 chmod +x "$BIN/termux-url-opener"
 
-echo "==> Termux:API アプリの確認"
-# アプリが無い（または入手元が違って署名が合わない）と termux-* コマンドは応答しないまま止まる
-if timeout 15 termux-toast "pocket のセットアップが終わりました" 2>/dev/null; then
-	api_ok=1
-else
-	api_ok=0
-fi
-
 echo
 if [ $api_ok = 1 ]; then
+	termux-toast "pocket のセットアップが終わりました"
 	echo "完了！"
 else
 	cat <<'MSG'

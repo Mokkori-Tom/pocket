@@ -1,0 +1,32 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 内部ストレージのフォルダを一覧でたどって選ばせ、選んだフォルダの絶対パスを出力する。
+# パスを打たずに済むよう、入力はすべて termux-dialog の一覧で受ける。
+#
+#   pocket-pick-dir [ダイアログのタイトル] [最初に開くフォルダ]
+#
+# キャンセルされたら何も出さずに終了コード 1、内部ストレージが読めなければ 2。
+title=${1:-フォルダを選ぶ}
+root=$HOME/storage/shared
+[ -d "$root" ] || { echo "内部ストレージにアクセスできません（termux-setup-storage が必要です）" >&2; exit 2; }
+
+dir=$root
+[[ -d ${2:-} && $2 == "$root"/* ]] && dir=$2
+
+while :; do
+	mapfile -t subs < <(find "$dir/" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | sort)
+	here=${dir#"$root"}
+	opts=("✅ ここにする（内部ストレージ${here}）")
+	[ "$dir" != "$root" ] && opts+=("⬆ 上のフォルダへ")
+	for s in "${subs[@]}"; do opts+=("📁 $s"); done
+	# sheet の選択肢はカンマ区切りなので、名前の中のカンマは全角にする
+	labels=$(printf '%s\n' "${opts[@]}" | sed 's/,/，/g' | paste -sd,)
+	idx=$(termux-dialog sheet -t "$title" -v "$labels" | jq -r '.index // empty')
+	[ -z "$idx" ] && exit 1
+	[ "$idx" = 0 ] && break
+	if [ "$dir" != "$root" ]; then
+		[ "$idx" = 1 ] && { dir=$(dirname "$dir"); continue; }
+		idx=$((idx - 1))
+	fi
+	dir="$dir/${subs[$((idx - 1))]}"
+done
+printf '%s\n' "$dir"

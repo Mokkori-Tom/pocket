@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ~/.config/pocket/env の KEY="VALUE" を書き換える（無ければ足す）。
+#
+#   pocket-setconf KEY VALUE
+CONF=$HOME/.config/pocket/env
+[ $# = 2 ] || { echo "使い方: pocket-setconf KEY VALUE" >&2; exit 2; }
+mkdir -p "$(dirname "$CONF")"
+{ grep -v "^$1=" "$CONF" 2>/dev/null; printf '%s="%s"\n' "$1" "$2"; } >"$CONF.new" && mv "$CONF.new" "$CONF"

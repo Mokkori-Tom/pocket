@@ -13,6 +13,7 @@ const usage = `使い方: pocket <コマンド> [引数]
   link <URL>     ページのタイトルを取ってきて Markdown リンクにする
   decode [文字列] JSON / Base64 / URLエンコード / UNIX時刻 / JWT を自動判別して読める形にする
   memo [文字列]   日時つきでメモに追記する（引数なしなら最近のメモを表示）
+  memo-path      メモの保存先を表示する（POCKET_MEMO で変えられる）
 
 文字列を省略すると標準入力から読みます。
 `
@@ -33,6 +34,8 @@ func main() {
 		out, err = runDecode(argOrStdin(args))
 	case "memo":
 		out, err = runMemo(strings.Join(args, " "))
+	case "memo-path":
+		out = memoPath()
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

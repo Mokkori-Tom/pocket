@@ -1,0 +1,17 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# クイックメモの保存先フォルダを一覧から選ぶ。今までのメモがあれば移すかどうかも聞く。
+. "$HOME/.config/pocket/env" 2>/dev/null
+old=${POCKET_MEMO:-$(pocket memo-path)}
+dir=$(pocket-pick-dir "メモを保存するフォルダ" "$(dirname "$old")") || {
+	[ $? = 2 ] && termux-toast "先に Termux で termux-setup-storage を実行してください"
+	exit 0
+}
+new=$dir/pocket-memo.md
+if [ "$new" != "$old" ] && [ -s "$old" ] && [ ! -e "$new" ]; then
+	ans=$(termux-dialog confirm -t "メモの保存先" -i "今までのメモ（$(wc -l <"$old") 件）も新しい場所に移しますか？" | jq -r '.text // empty')
+	if [ "$ans" = yes ]; then
+		mv "$old" "$new" || { termux-toast "移せませんでした"; exit 1; }
+	fi
+fi
+pocket-setconf POCKET_MEMO "$new"
+termux-toast "メモの保存先: 内部ストレージ${new#"$HOME/storage/shared"}"
