@@ -1,0 +1,28 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Gboard で書いた文章を、時刻つきの箇条書きで今日の日誌の末尾に足す。
+# 日誌の場所は OKF_DAILY（date の書式、既定は 日記/年/月/YYYY-MM-DD）。
+# 日誌がなければ作る。バンドルに Templates/daily.md があればそれを使う。
+. "$HOME/.config/pocket/env" 2>/dev/null
+[ -d "${OKF_BUNDLE:-}" ] || { termux-toast "ウィジェットの「okfバンドルを選ぶ」でバンドルを選んでください"; exit 1; }
+
+text=$(termux-dialog text -m -t "今日の日誌に追記" -i "改行もできます" | jq -r 'select(.code == -1) | .text // empty')
+[ -z "$text" ] && exit 0
+
+today=$(date +%F)
+id=$(date +"${OKF_DAILY:-日記/%Y/%m/%F}")
+f="$OKF_BUNDLE/$id.md"
+if [ ! -e "$f" ]; then
+	fm=$(printf -- '---\njournal: daily\njournal-date: %s\n---\n' "$today")
+	if [ -e "$OKF_BUNDLE/Templates/daily.md" ]; then
+		err=$(okf new "$OKF_BUNDLE" "$id" --template daily --body - <<<"$fm" 2>&1 >/dev/null)
+	else
+		err=$(okf new "$OKF_BUNDLE" "$id" --type Journal --title "$today" --body - <<<"$fm"$'\n\n← 前日 | 翌日 →\n```journal-nav\n```' 2>&1 >/dev/null)
+	fi || { termux-toast "日誌を作れませんでした: $err"; exit 1; }
+fi
+
+# 直前が箇条書きでも空行でもなければ、空行を挟んでからリストを始める
+[ -n "$(tail -c1 "$f")" ] && echo >>"$f"
+last=$(tail -n1 "$f")
+[[ -z $last || $last == "- "* || $last == "  "* ]] || echo >>"$f"
+printf -- '- %s %s\n' "$(date +%H:%M)" "${text//$'\n'/$'\n  '}" >>"$f"
+termux-toast "$id.md に追記しました"

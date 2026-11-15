@@ -77,22 +77,23 @@ if [ $WITH_OKF = 1 ]; then
 			if [ ${#vaults[@]} -eq 1 ]; then
 				echo "OKF_BUNDLE=\"${vaults[0]}\""
 			else
-				echo "OKF_BUNDLE=\"\"  # ← okf のバンドル（Obsidian の保管庫）のパスを書く"
 				for v in "${vaults[@]}"; do echo "#OKF_BUNDLE=\"$v\""; done
 			fi
 			echo "#export OKF_AUTHOR=human:名前  # ノートの作成者として記録される"
+			echo "#OKF_DAILY=\"日記/%Y/%m/%F\"     # 日誌の場所（date の書式）。バンドル直下なら \"%F\""
 		} >>"$CONF"
 	fi
 	. "$CONF"
 	if [ -d "${OKF_BUNDLE:-}" ]; then
 		echo "    OKF_BUNDLE=$OKF_BUNDLE"
 	else
-		echo "    !! okf のバンドルが決まっていません。$CONF の OKF_BUNDLE を書いてください"
+		echo "    !! okf のバンドルが決まっていません。ウィジェットの「okfバンドルを選ぶ」で選んでください"
 	fi
 fi
 
 echo "==> ショートカット"
 rm -f "$HOME/.shortcuts/tasks/クリップを解読" # 古い版の置き場所（バックグラウンドではクリップボードを読めない）
+rm -f "$HOME/.shortcuts/tasks/okf今日に追記"  # okf日誌に追記 の古い名前
 cp -r termux/shortcuts/. "$HOME/.shortcuts/"
 if [ $WITH_OKF = 1 ]; then cp -r termux/okf-shortcuts/. "$HOME/.shortcuts/"; fi
 chmod 700 "$HOME/.shortcuts" "$HOME/.shortcuts/tasks"
